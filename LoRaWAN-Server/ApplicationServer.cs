@@ -6,6 +6,8 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
+using System.Security.Cryptography.X509Certificates;
+using System.Net.Security;
 
 namespace LoRaWANServer
 {
@@ -13,9 +15,10 @@ namespace LoRaWANServer
     {
         private TcpListener server;
         private TcpClient client;
-        private NetworkStream stream;
-        private IPAddress ip;
+        private SslStream sslStream;
 
+        private IPAddress ip;
+        private X509Certificate2 sslCertificate = null;
 
         /// <summary>
         /// Starts the server on the specified IP address and port.
@@ -92,14 +95,23 @@ namespace LoRaWANServer
                 // Indicate a EndPoint of the connected client.
                 Console.WriteLine("Connected to client " + ((IPEndPoint)client.Client.RemoteEndPoint).ToString());
 
-                // Get the network stream for reading message from the client
-                stream = client.GetStream();
+                // Get the network stream to generate ssl stream to read messages from client
+                NetworkStream stream = client.GetStream();
+
+                //Wrap client in SSLstream
+                sslStream = new SslStream(stream, false);
+
+                //Read self-signed certificate
+                sslCertificate = new X509Certificate2(@"C:\Users\Legion\projects\LoRaWAN-Server\LoRaWAN.pfx", "sTrongPassW1");
+
+                //Authenticate server with self-signed certificate, false (for not requiring client authentication), SSL protocol type, ...
+                sslStream.AuthenticateAsServer(sslCertificate, false, System.Security.Authentication.SslProtocols.Default, false);
 
                 // Create a byte array to store the received message
                 byte[] buffer = new byte[1024];
 
-                // Read message from the network stream into the buffer
-                int bytesRead = stream.Read(buffer, 0, buffer.Length);
+                // Read message from the ssl stream into the buffer
+                int bytesRead = sslStream.Read(buffer, 0, buffer.Length);
 
                 // Convert the received bytes into a string
                 string message = Encoding.ASCII.GetString(buffer, 0, bytesRead);
@@ -136,8 +148,8 @@ namespace LoRaWANServer
                 // Convert the response message to a byte array
                 byte[] responseBuffer = Encoding.ASCII.GetBytes(response);
 
-                // Write the response message to the network stream
-                stream.Write(responseBuffer, 0, responseBuffer.Length);
+                // Write the response message to the ssl stream
+                sslStream.Write(responseBuffer, 0, responseBuffer.Length);
 
                 // Output a message indicating that the response was sent
                 Console.WriteLine("Response sent.");
@@ -168,8 +180,8 @@ namespace LoRaWANServer
                 // Close the client connection after sending the response
                 client.Close();
 
-                // Close the network stream
-                stream.Close();
+                // Close the ssl stream
+                sslStream.Close();
 
                 // Output a message indicating that the server has stopped
                 Console.WriteLine("Disconnected from client" + clientIpEndPoint);
