@@ -1,6 +1,7 @@
 # LoRaWAN-Server
 
-## SSL Certificate Creation (Windows Powershell in Administrator Mode)
+## SSL Certificate Creation
+- SSL Key and Password generated __easily__ using Windows Powershell in Administrator Mode.
 
 ```$cert = New-SelfSignedCertificate -DnsName "LoRaWAN" -CertStoreLocation "cert:\LocalMachine\My" Export-PfxCertificate -Cert $cert -FilePath "LoRaWAN.pfx" -Password (ConvertTo-SecureString -String "sTrongPassW1" -Force -AsPlainText)```
 
