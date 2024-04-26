@@ -107,20 +107,42 @@ namespace LoRaWANServer
                 //Authenticate server with self-signed certificate, false (for not requiring client authentication), SSL protocol type, ...
                 sslStream.AuthenticateAsServer(sslCertificate, false, System.Security.Authentication.SslProtocols.Default, false);
 
-                // Create a byte array to store the received message
-                byte[] buffer = new byte[1024];
+                // Create a byte array to store received data
+                byte[] buffer = new byte[2048];
 
-                // Read message from the ssl stream into the buffer
-                int bytesRead = sslStream.Read(buffer, 0, buffer.Length);
+                // Initialize a StringBuilder to construct the received message
+                StringBuilder messageData = new StringBuilder();
 
-                // Convert the received bytes into a string
-                string message = Encoding.ASCII.GetString(buffer, 0, bytesRead);
+                int bytesRead = -1;
+
+                do
+                {
+                    // Read data from the network stream and store the number of bytes read
+                    bytesRead = sslStream.Read(buffer, 0, buffer.Length);
+
+                    // Create a UTF-8 decoder
+                    Decoder decoder = Encoding.UTF8.GetDecoder();
+
+                    // Decode bytes to characters
+                    char[] chars = new char[decoder.GetCharCount(buffer, 0, bytesRead)];
+                    decoder.GetChars(buffer, 0, bytesRead, chars, 0);
+
+                    // Append decoded characters to the messageData StringBuilder
+                    messageData.Append(chars);
+
+                    // Check for end-of-file indicator
+                    if (messageData.ToString().IndexOf("<EOF>") != -1)
+                    {
+                        // Exit loop if end-of-file indicator is found
+                        break;
+                    }
+                } while (bytesRead != 0); // Continue looping until no more data is read
 
                 // Output the received message
-                Console.WriteLine("Received message: " + message);
+                Console.WriteLine("Received response: " + messageData.ToString());
 
-                // Return the received message
-                return message;
+                // Return received response
+                return messageData.ToString();
             }
             catch (Exception ex)
             {
@@ -146,10 +168,10 @@ namespace LoRaWANServer
                 string response = "Server response: " + message;
 
                 // Convert the response message to a byte array
-                byte[] responseBuffer = Encoding.ASCII.GetBytes(response);
+                byte[] responseBuffer = Encoding.UTF8.GetBytes(response);
 
                 // Write the response message to the ssl stream
-                sslStream.Write(responseBuffer, 0, responseBuffer.Length);
+                sslStream.Write(responseBuffer);
 
                 // Output a message indicating that the response was sent
                 Console.WriteLine("Response sent.");
@@ -184,7 +206,7 @@ namespace LoRaWANServer
                 sslStream.Close();
 
                 // Output a message indicating that the server has stopped
-                Console.WriteLine("Disconnected from client" + clientIpEndPoint);
+                Console.WriteLine("Disconnected from client " + clientIpEndPoint);
 
                 // Return true indicating successful server stop
                 return true;
