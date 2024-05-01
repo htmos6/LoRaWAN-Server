@@ -13,7 +13,7 @@ namespace LoRaWANServer
         static void Main()
         {
             ApplicationServer applicationServer = new ApplicationServer();
-            applicationServer.Run("127.0.0.1", 8080);
+            applicationServer.Run("127.0.0.1", 8082);
         }
     }
 }
