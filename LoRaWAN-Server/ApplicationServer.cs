@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Security.Cryptography.X509Certificates;
 using System.Net.Security;
+using LoRaWAN_Gateway;
+using System.Xml.Linq;
 
 namespace LoRaWANServer
 {
@@ -20,6 +22,12 @@ namespace LoRaWANServer
         private IPAddress ip;
         private X509Certificate2 sslCertificate = null;
 
+        private AesCryptographyService aes256 = new AesCryptographyService();
+
+        byte[] key = new byte[16] { 0x69, 0x93, 0xAB, 0x4F, 0x2A, 0xC1, 0x0F, 0x2D, 0x3A, 0x5B, 0x21, 0x8C, 0x4E, 0x97, 0xE9, 0x6C };
+        byte[] iv = new byte[16] { 0x8A, 0x57, 0x6F, 0x0C, 0x45, 0x83, 0x28, 0xE0, 0x9E, 0x41, 0x23, 0x14, 0x36, 0xD7, 0xB7, 0x55 };
+
+
         /// <summary>
         /// Starts the server on the specified IP address and port.
         /// </summary>
@@ -30,6 +38,8 @@ namespace LoRaWANServer
         {
             try
             {
+                Console.WriteLine("\n\n\n************ Server Session ************\n\n");
+
                 // Parse IP address and initialize server
                 ip = IPAddress.Parse(ipAddress);
 
@@ -138,8 +148,15 @@ namespace LoRaWANServer
                     }
                 } while (bytesRead != 0); // Continue looping until no more data is read
 
-                // Output the received message
-                Console.WriteLine("Received response: " + messageData.ToString());
+                Console.WriteLine("Received encrypted message: " + messageData.ToString());
+
+                string encryptedMessage = messageData.ToString().Replace("<EOF>", "");
+                byte[] bytes = Hex2Str(encryptedMessage);
+
+                var message = Encoding.ASCII.GetString(aes256.Decrypt(bytes, key, iv));
+
+                Console.WriteLine($"\n\nReceived encrypted message : {Encoding.ASCII.GetString(bytes)}");
+                Console.WriteLine("Received decrypted message: " + message + "\n");
 
                 // Return received response
                 return messageData.ToString();
@@ -165,7 +182,7 @@ namespace LoRaWANServer
             try
             {
                 // Create the response message to send to the client
-                string response = "Server response: " + message;
+                string response = message;
 
                 // Convert the response message to a byte array
                 byte[] responseBuffer = Encoding.UTF8.GetBytes(response);
@@ -174,7 +191,7 @@ namespace LoRaWANServer
                 sslStream.Write(responseBuffer);
 
                 // Output a message indicating that the response was sent
-                Console.WriteLine("Response sent.");
+                Console.WriteLine("\nResponse sent : " + response);
 
                 // Return true to indicate that the response was successfully sent
                 return true;
@@ -206,7 +223,8 @@ namespace LoRaWANServer
                 sslStream.Close();
 
                 // Output a message indicating that the server has stopped
-                Console.WriteLine("Disconnected from client " + clientIpEndPoint);
+                Console.WriteLine("\nDisconnected from client " + clientIpEndPoint);
+                Console.WriteLine("\n\n************ Server Session End ************\n\n\n");
 
                 // Return true indicating successful server stop
                 return true;
@@ -259,6 +277,29 @@ namespace LoRaWANServer
                 // Stop the server if failed to start
                 server.Stop();
             }
+        }
+
+
+        /// <summary>
+        /// Converts a hexadecimal string to a byte array.
+        /// </summary>
+        /// <param name="hexString">The hexadecimal string to convert.</param>
+        /// <returns>The byte array representing the hexadecimal string.</returns>
+        private byte[] Hex2Str(string hexString)
+        {
+            // Split the hexadecimal string by '-' delimiter
+            string[] hexValuesSplit = hexString.Split('-');
+
+            // Create a byte array to store the parsed hexadecimal values
+            byte[] bytes = new byte[hexValuesSplit.Length];
+
+            // Parse each hexadecimal string and store it in the byte array
+            for (int i = 0; i < hexValuesSplit.Length; i++)
+            {
+                bytes[i] = byte.Parse(hexValuesSplit[i], System.Globalization.NumberStyles.HexNumber);
+            }
+
+            return bytes;
         }
     }
 }
